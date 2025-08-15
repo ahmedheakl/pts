@@ -29,7 +29,7 @@ class Diffusion:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
 
         # Generate output
-        outputs = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens, **kwargs)
+        outputs = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens, use_cache=False, **kwargs)
 
         # Decode the output tokens
         text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)

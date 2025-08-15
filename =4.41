@@ -1,0 +1,25 @@
+Collecting transformers
+  Using cached transformers-4.55.2-py3-none-any.whl (11.3 MB)
+Requirement already satisfied: pyyaml>=5.1 in ./.venv/lib/python3.9/site-packages (from transformers) (6.0.2)
+Collecting huggingface-hub<1.0,>=0.34.0
+  Using cached huggingface_hub-0.34.4-py3-none-any.whl (561 kB)
+Requirement already satisfied: tqdm>=4.27 in ./.venv/lib/python3.9/site-packages (from transformers) (4.67.1)
+Requirement already satisfied: requests in ./.venv/lib/python3.9/site-packages (from transformers) (2.32.4)
+Requirement already satisfied: packaging>=20.0 in ./.venv/lib/python3.9/site-packages (from transformers) (25.0)
+Requirement already satisfied: numpy>=1.17 in ./.venv/lib/python3.9/site-packages (from transformers) (1.26.3)
+Collecting regex!=2019.12.17
+  Using cached regex-2025.7.34-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (789 kB)
+Requirement already satisfied: filelock in ./.venv/lib/python3.9/site-packages (from transformers) (3.19.1)
+Collecting tokenizers<0.22,>=0.21
+  Using cached tokenizers-0.21.4-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.1 MB)
+Collecting safetensors>=0.4.3
+  Using cached safetensors-0.6.2-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (485 kB)
+Requirement already satisfied: fsspec>=2023.5.0 in ./.venv/lib/python3.9/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (2025.7.0)
+Requirement already satisfied: typing-extensions>=3.7.4.3 in ./.venv/lib/python3.9/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (4.14.1)
+Requirement already satisfied: hf-xet<2.0.0,>=1.1.3 in ./.venv/lib/python3.9/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (1.1.7)
+Requirement already satisfied: idna<4,>=2.5 in ./.venv/lib/python3.9/site-packages (from requests->transformers) (3.10)
+Requirement already satisfied: urllib3<3,>=1.21.1 in ./.venv/lib/python3.9/site-packages (from requests->transformers) (2.5.0)
+Requirement already satisfied: certifi>=2017.4.17 in ./.venv/lib/python3.9/site-packages (from requests->transformers) (2025.8.3)
+Requirement already satisfied: charset_normalizer<4,>=2 in ./.venv/lib/python3.9/site-packages (from requests->transformers) (3.4.3)
+Installing collected packages: huggingface-hub, tokenizers, safetensors, regex, transformers
+Successfully installed huggingface-hub-0.34.4 regex-2025.7.34 safetensors-0.6.2 tokenizers-0.21.4 transformers-4.55.2

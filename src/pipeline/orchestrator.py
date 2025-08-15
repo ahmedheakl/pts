@@ -30,7 +30,7 @@ class Pipeline:
         return cls(cfg=cfg, diffusion=diffusion, llm=llm)
 
     def run(self, user_prompt: str, extra_text: Optional[List[str]] = None,
-            refine_with_llm: bool = True) -> Dict:
+            refine_with_llm: bool = False) -> Dict:
         # 1) diffusion produces plan/structure
         plan = self.diffusion.generate(user_prompt)
         plan_text = plan["text"]
