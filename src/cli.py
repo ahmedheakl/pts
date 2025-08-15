@@ -1,4 +1,5 @@
-import argparse, sys
+import argparse
+import sys
 from .pipeline.orchestrator import Pipeline
 
 
@@ -11,7 +12,7 @@ def main():
     args = ap.parse_args()
 
     pipe = Pipeline.from_yaml(args.config)
-    out = pipe.run(user_prompt=args.prompt, extra_text=args.extra, refine_with_llama=not args.no_refine)
+    out = pipe.run(user_prompt=args.prompt, extra_text=args.extra, refine_with_llm=not args.no_refine)
     print(f"Saved: {out['saved_path']}")
     return 0
 

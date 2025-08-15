@@ -43,13 +43,11 @@ Example:
 
 ```yaml
 diffusion:
-  impl: "local"
   model_id: "LLada-Text-Diffuser-1.0"
   device: "cuda:0"
   max_new_tokens: 256
 
 llm:
-  impl: "hf"
   model_id: "meta-llama/Llama-3.1-8B-Instruct"
   device: "cuda:0"
   max_new_tokens: 512
@@ -71,17 +69,17 @@ prompting:
 # Usage
 
 Run from the command line:
-```yaml
+```bash
 python -m src.cli \
   --config configs/default.yaml \
   --prompt "Write a plan for writing an essay about the pros and cons of artificial intelligence in education. " \
   --extra "Write an essay following this plan" \
   --no-refine
 ```
---no-refine means that you do not want an extra step of LLM that would rewrite the plan that outputed the diffusion. Remove this if you want to allow this extra step.
+`--no-refine` means that you do not want an extra step of LLM that would rewrite the plan that outputed the diffusion. Remove this if you want to allow this extra step.
 
 # Setup 1/ Setup2
-Modify concatenate.py to change how intermediate outputs are stitched.
+Modify `concatenate.py` to change how intermediate outputs are stitched.
 
 
 

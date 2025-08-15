@@ -1,15 +1,12 @@
 # Model identifiers can be HF model ids or internal checkpoints.
 diffusion:
-  # Replace with diffusion text model 
-  impl: "local"         # "local" | "http"
-  model_id: "GSAI-ML/LLaDA-8B-Base"
+  model_id: "GSAI-ML/LLaDA-8B-Instruct"
   device: "cuda:0"      # or "cpu"
   max_new_tokens: 256
 
 llm:
-  impl: "hf"            # huggingface transformers
   model_id: "meta-llama/Llama-3.2-3B-Instruct"
-  device: "cuda:0"
+  device: "cuda:1"
   max_new_tokens: 512
   temperature: 0.2
   do_sample: false

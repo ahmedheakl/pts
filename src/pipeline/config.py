@@ -2,13 +2,11 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 class DiffusionCfg(BaseModel):
-    impl: str = "local"
     model_id: str
     device: str = "cuda:0"
     max_new_tokens: int = 256
 
 class LLMCfg(BaseModel):
-    impl: str = "hf"
     model_id: str
     device: str = "cuda:0"
     max_new_tokens: int = 512

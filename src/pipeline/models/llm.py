@@ -1,22 +1,20 @@
 from typing import Dict, Optional
+
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
+
 class LLM:
     def __init__(self, model_id: str, device: str = "cuda:0", max_new_tokens: int = 512,
-                 temperature: float = 0.2, do_sample: bool = False, impl: str = "hf"):
+                 temperature: float = 0.2, do_sample: bool = False, **kwargs):
         self.model_id = model_id
-        self.impl = impl
         self.device = device
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
         self.do_sample = do_sample
-
-        if impl == "hf":
-            self.tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
-            self.model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="auto")
-        else:
-            raise NotImplementedError("Only HF path shown here.")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map="auto").eval()
+        
 
     def generate(self, system_prompt: Optional[str], user_prompt: str) -> Dict:
         if system_prompt:
@@ -34,7 +32,7 @@ class LLM:
             tokenize=True,
             return_dict=True,
             return_tensors="pt",
-        ).to(self.model.device)
+        ).to("cuda")
 
         # Generate output
         with torch.no_grad():
@@ -53,7 +51,6 @@ class LLM:
             "text": generated_text.strip(),
             "metadata": {
                 "model_id": self.model_id,
-                "impl": self.impl,
                 "device": self.device,
                 "max_new_tokens": self.max_new_tokens,
                 "temperature": self.temperature,
