@@ -1,0 +1,16 @@
+# Core
+torch>=2.2
+transformers>=4.41
+accelerate>=0.31
+einops>=0.7
+pydantic>=2.5
+pyyaml>=6.0
+
+
+# Optional: for saving JSON nicely & testing
+pytest>=8.0
+
+
+
+# CUDA:
+#pip install torch==2.2.2+cu121 --index-url https://download.pytorch.org/whl/cu121

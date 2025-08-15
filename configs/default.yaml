@@ -1,0 +1,27 @@
+# Model identifiers can be HF model ids or internal checkpoints.
+diffusion:
+  # Replace with diffusion text model 
+  impl: "local"         # "local" | "http"
+  model_id: "GSAI-ML/LLaDA-8B-Base"
+  device: "cuda:0"      # or "cpu"
+  max_new_tokens: 256
+
+llm:
+  impl: "hf"            # huggingface transformers
+  model_id: "meta-llama/Llama-3.2-3B-Instruct"
+  device: "cuda:0"
+  max_new_tokens: 512
+  temperature: 0.2
+  do_sample: false
+
+runtime:
+  output_dir: "outputs"
+  json_prefix: "run"
+  seed: 42
+
+prompting:
+  # Template for the *final* LLM call that takes concatenated input
+  final_system_msg: "You are a graduate student."
+  concat_header_plan: "## PLAN"
+  concat_header_refined: "## REFINED PLAN"
+  concat_header_extra: "## LLM Instructions"
