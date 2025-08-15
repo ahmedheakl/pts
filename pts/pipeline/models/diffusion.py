@@ -121,14 +121,12 @@ class Diffusion:
         ).eval()
 
     def generate(self, prompt: str, **kwargs) -> Dict:
-        print(f"Generating with diffusion model {self.model_id} ...")
         m = [{"role": "user", "content": prompt}, ]
         prompt = self.tokenizer.apply_chat_template(m, add_generation_prompt=True, tokenize=False)
         input_ids = self.tokenizer(prompt)['input_ids']
         input_ids = torch.tensor(input_ids).to("cuda").unsqueeze(0)
-        out = generate(self.model, input_ids, steps=128, gen_length=128, block_length=32, temperature=0., cfg_scale=0., remasking='low_confidence')
+        out = generate(self.model, input_ids, steps=128, gen_length=self.max_new_tokens, block_length=32, temperature=0., cfg_scale=0., remasking='low_confidence')
         text = self.tokenizer.batch_decode(out[:, input_ids.shape[1]:], skip_special_tokens=True)[0]
-        print(f"Generated text: {text[:100]}...")
         return {
             "text": text,
             "metadata": {

@@ -8,10 +8,10 @@ from .config import AppCfg
 from .models.llm import LLM
 from .models.diffusion import Diffusion
 from .concatenate import stitch
-from .utils import save_json, timestamp
+from .utils import timestamp
 
 @dataclass
-class Pipeline:
+class PTSPipeline:
     cfg: AppCfg
     llm: LLM
     diffusion: Diffusion
@@ -28,6 +28,15 @@ class Pipeline:
         diffusion = Diffusion(**cfg.diffusion.model_dump())
         llm = LLM(**cfg.llm.model_dump())
         return cls(cfg=cfg, diffusion=diffusion, llm=llm)
+    
+    def generate_plan(self, user_prompt: str) -> Dict:
+        return self.diffusion.generate(user_prompt)
+    
+    def generate_answer(self, user_prompt: str):
+        return self.llm.generate(
+            system_prompt=self.cfg.prompting.final_system_msg,
+            user_prompt=user_prompt
+        )
 
     def run(self, user_prompt: str, extra_text: Optional[List[str]] = None,
             refine_with_llm: bool = False) -> Dict:
@@ -85,6 +94,6 @@ class Pipeline:
                 "llm": final["metadata"]
             }
         }
-        path = save_json(result, self.cfg.runtime.output_dir, self.cfg.runtime.json_prefix)
-        result["saved_path"] = path
+        # path = save_json(result, self.cfg.runtime.output_dir, self.cfg.runtime.json_prefix)
+        # result["saved_path"] = path
         return result

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pts"
+version = "0.1.0"
+description = "Planning-then-Text System (PTS)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+pts = "pts.cli:main"                   # if pts/cli.py defines main()
+pts-eval-arc = "pts.eval.eval_arc:main" # if pts/eval/eval_arc.py defines main()
+
+[tool.setuptools.packages.find]
+include = ["pts*"]

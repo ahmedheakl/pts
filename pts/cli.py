@@ -1,6 +1,6 @@
 import argparse
 import sys
-from .pipeline.orchestrator import Pipeline
+from .pipeline.orchestrator import PTSPipeline
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
     ap.add_argument("--no-refine", action="store_true", help="Skip the stage-1 Llama refinement")
     args = ap.parse_args()
 
-    pipe = Pipeline.from_yaml(args.config)
+    pipe = PTSPipeline.from_yaml(args.config)
     out = pipe.run(user_prompt=args.prompt, extra_text=args.extra, refine_with_llm=not args.no_refine)
     print(f"Saved: {out['saved_path']}")
     return 0
