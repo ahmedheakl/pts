@@ -1,5 +1,8 @@
-import json, os, time
+import json
+import os
+import time
 from typing import Dict
+import yaml
 
 def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
@@ -14,3 +17,7 @@ def save_json(obj: Dict, out_dir: str, prefix: str) -> str:
     with open(fpath, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
     return fpath
+
+def read_yaml(file_path):
+        with open(file_path, 'r') as file:
+            return yaml.safe_load(file)

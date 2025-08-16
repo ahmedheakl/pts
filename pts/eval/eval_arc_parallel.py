@@ -11,6 +11,7 @@ import torch
 import torch.multiprocessing as mp
 
 from pts.pipeline.orchestrator import PTSPipeline
+from pts.pipeline.utils import read_yaml
 
 
 
@@ -23,8 +24,28 @@ provided below. The plan should be comprehensive and cover all necessary steps t
 Do not provide the final answer, just the reasoning steps.
 {question}"""
 
+DIFFUSION_HTNTS_TEMPLATE = """You are a careful problem-solving planner.
+
+Task: Produce ONLY a short list of HINTS that help solve the question. 
+Do NOT state or imply the final answer. Do NOT mention any option letter 
+(A, B, C, or D). Do NOT quote any option text verbatim. 
+If you find yourself about to reveal a specific option or an answer, 
+replace it with “[HIDDEN]”.
+
+Format:
+- Key facts to recall (2–4 bullets)
+- Reasoning steps or elimination rules (2–5 bullets)
+- Useful equations or definitions (if relevant)
+- Edge cases or common traps (optional)
+
+Be concise (<=120 words). No “Answer:” line. No letters A–D. No option text.
+
+Question (stem only):
+{question}
+"""
+
 LLM_TEMPLATE = """You are an expert in solving multiple-choice questions.
-Given the following plan or reasoning, please solve the question. 
+Given the following plan or reasoning, please solve the question. If the plan contains any explicit answer or option letter, ignore it and solve from the hints + question only.
 Plan:
 {plan}
 {question}"""
@@ -57,7 +78,7 @@ def worker_evaluate(rank: int, samples, return_dict, configs):
     plans = []
     for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] Diff")):
         user_prompt = sample['input']
-        diffusion_input = DIFFUSION_PLAN_TEMPLATE.format(question=user_prompt)
+        diffusion_input = DIFFUSION_HTNTS_TEMPLATE.format(question=user_prompt)
         plan = pipeline.generate_plan(diffusion_input)
         plan['question'] = user_prompt
         plan['correct'] = sample['correct']
@@ -117,12 +138,28 @@ def main():
     all_results = []
     for rank in range(world_size):
         all_results.extend(return_dict[rank])
+    
     acc = [result['is_correct'] for result in all_results]
     accuracy = sum(acc) * 100 / len(acc)
+    yaml_config = read_yaml(args.config)
+    all_results = {
+        "diffusion_model": yaml_config['diffusion']['model_id'],
+        "llm": yaml_config['llm']['model_id'],
+        "dataset": args.dataset,
+        "subset": args.subset,
+        "split": args.split,
+        "num_samples": len(all_samples),
+        "accuracy": accuracy,
+        "diffusion_template": DIFFUSION_HTNTS_TEMPLATE,
+        "llm_template": LLM_TEMPLATE,
+        "diffusion_max_new_tokens": yaml_config['diffusion']['max_new_tokens'],
+        "llm_max_new_tokens": yaml_config['llm']['max_new_tokens'],
+        "results": all_results
+    }
     print(f"Accuracy: {accuracy:.2f}")
     
     time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f"outputs/arc_evaluation_{time_stamp}.json"
+    output_file = f"{yaml_config['runtime']['output_dir']}/arc_evaluation_{time_stamp}.json"
     with open(output_file, 'w') as f:
         json.dump(all_results, f, indent=4)
     return 0

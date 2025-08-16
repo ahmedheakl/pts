@@ -50,7 +50,7 @@ def parse_args():
     parser.add_argument("--subset", default="ARC-Challenge")
     parser.add_argument("--split", default="test")
     parser.add_argument("--llm_refine", action="store_true")
-    parser.add_argument("--num_samples", type=int, default=10)
+    parser.add_argument("--num_samples", type=int, default=200)
     args = parser.parse_args()
     return args
 
@@ -61,14 +61,35 @@ def main_llm():
     dataset = dataset.shuffle(seed=42)
     dataset = dataset.select(range(args.num_samples)) if args.num_samples > 0 else dataset
     pipeline = PTSPipeline.from_yaml(args.config)
-    acc = []
+    results = []
     for sample in tqdm(dataset, desc="Processing samples"):
         prepared_sample = prepare_arc_sample(sample)
         user_prompt = prepared_sample['input']
         llm_input = user_prompt + QUESTION_POSTFIX
         out = pipeline.generate_answer(llm_input)
-        acc.append(compare_answers(out['text'], prepared_sample['correct']))
-    accuracy = sum(acc) / len(acc)
+        results.append({
+            "is_correct": compare_answers(out['text'], prepared_sample['correct']),
+            "question": prepared_sample['input'],
+            "predicted_answer": out['text'],
+            "ground_truth": prepared_sample['correct']
+            
+        })
+    accuracy = sum(result['is_correct'] for result in results) / len(results)
+    results = {
+        "accuracy": accuracy,
+        "num_samples": len(results),
+        "dataset": args.dataset,
+        "subset": args.subset,
+        "split": args.split,
+        "config": args.config,
+        "results": results,
+    }
+    from datetime import datetime
+    time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = f"outputs/arc_results_{time_stamp}.json"
+    import json
+    with open(path, 'w') as f:
+        json.dump(results, f, indent=4)
     print(f"Accuracy: {accuracy:.4f}")
     
 
