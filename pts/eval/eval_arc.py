@@ -4,8 +4,10 @@ from tqdm import tqdm
 import re
 
 from datasets import load_dataset
+from mathruler.grader import extract_boxed_content, grade_answer
 
 from pts.pipeline.orchestrator import PTSPipeline
+
 
 
 QUESTION_PROMPT_TEMPLATE = """Question: {question}\n{choices_text}"""
@@ -41,6 +43,10 @@ def compare_answers(predicted, correct):
     matched_group = pred_answer.group(1) or pred_answer.group(2)
     response = matched_group.strip()[0]
     return float(correct.lower().strip()[0] == response.lower())
+
+def compare_answers_dart(predicted, correct):
+    pred_answer = extract_boxed_content(predicted.strip())
+    return 1.0 if grade_answer(pred_answer, correct) else 0.0, predicted
 
 
 def parse_args():

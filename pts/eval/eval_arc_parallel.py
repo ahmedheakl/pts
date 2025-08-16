@@ -9,14 +9,18 @@ from datetime import datetime
 from datasets import load_dataset
 import torch
 import torch.multiprocessing as mp
-
+from mathruler.grader import extract_boxed_content, grade_answer
 from pts.pipeline.orchestrator import PTSPipeline
 from pts.pipeline.utils import read_yaml
 
 
 
-QUESTION_PROMPT_TEMPLATE = """Question: {question}\n{choices_text}"""
-QUESTION_POSTFIX = """\nAnswer with a single letter (A, B, C, or D) and no explanation. You answer should start with "Answer: " and be followed by the letter of the answer you choose. Do not include any other text in your response."""
+
+ARC_QUESTION_PROMPT_TEMPLATE = """Question: {question}\n{choices_text}"""
+ARC_QUESTION_POSTFIX = """\nAnswer with a single letter (A, B, C, or D) and no explanation. You answer should start with "Answer: " and be followed by the letter of the answer you choose. Do not include any other text in your response."""
+
+DART_QUESTION_PROMPT_TEMPLATE = """Question: {question}"""
+DART_QUESTION_PREFIX = """\nThe final answer MUST BE put in \\boxed{{}} and no explanation."""
 
 DIFFUSION_PLAN_TEMPLATE = """You are an expert in solving multiple-choice questions.
 Your task is to generate a detailed plan or reasoning step-by-step of how to tackle the question
@@ -50,13 +54,18 @@ Plan:
 {plan}
 {question}"""
 
+def prepare_dart_sample(item):
+    question = item["query"]
+    answer_key = item["gt_ans"]
+    input_text = DART_QUESTION_PROMPT_TEMPLATE.format(question=question)
+    return {"input": input_text, "correct": answer_key}
 
 def prepare_arc_sample(item):
     question = item["question"]
     choices = item["choices"]
     answer_key = item["answerKey"]
     choices_text = "\n".join([f"{chr(65+i)}. {choice}" for i, choice in enumerate(choices["text"])])
-    input_text = QUESTION_PROMPT_TEMPLATE.format(question=question, choices_text=choices_text)
+    input_text = ARC_QUESTION_PROMPT_TEMPLATE.format(question=question, choices_text=choices_text)
     labels = choices["label"]
     correct_idx = labels.index(answer_key)
     answer_key = chr(65 + correct_idx)  # Convert index to letter (A, B, C, D)
@@ -71,7 +80,12 @@ def compare_answers(predicted, correct):
     response = matched_group.strip()[0]
     return float(correct.lower().strip()[0] == response.lower())
 
-def worker_evaluate(rank: int, samples, return_dict, configs):
+def compare_answers_dart(predicted, correct):
+    pred_answer = extract_boxed_content(predicted.strip())
+    return 1.0 if grade_answer(pred_answer, correct) else 0.0
+
+
+def worker_evaluate(rank: int, samples, return_dict, configs, postfix=ARC_QUESTION_POSTFIX):
     torch.cuda.set_device(rank)
     pipeline = PTSPipeline.from_yaml(configs)
     local_results = {}
@@ -88,11 +102,11 @@ def worker_evaluate(rank: int, samples, return_dict, configs):
     local_results = []
     for plan in tqdm(plans, desc="Running LLM refinement"):
         question = plan['question']
-        llm_input = LLM_TEMPLATE.format(question=question, plan=plan['text']) + QUESTION_POSTFIX
+        llm_input = LLM_TEMPLATE.format(question=question, plan=plan['text']) + postfix
         out = pipeline.generate_answer(llm_input)
         print(out['text'])
         local_results.append({
-            "is_correct": compare_answers(out['text'], plan['correct']),
+            "is_correct": compare_answers_dart(out['text'], plan['correct']),
             "question": question,
             "predicted_plan": plan['text'],
             "predicted_answer": out['text'],
@@ -114,10 +128,17 @@ def parse_args():
 def main():
     args = parse_args()
     print(f"Loading dataset {args.dataset} subset {args.subset} split {args.split}")
-    dataset = load_dataset(args.dataset, args.subset, split=args.split)
+    if "ARC" in args.dataset:
+        dataset = load_dataset(args.dataset, args.subset, split=args.split)
+    elif "dart" in args.dataset:
+        level = int(args.dataset.split("-")[-1])
+        dataset = load_dataset("hkust-nlp/dart-math-pool-math", split="train")
+        dataset = dataset.filter(lambda x: x['query_metadata']['level'] == level, num_proc=32) 
+    else:
+        ValueError(f"Unsupported dataset: {args.dataset}")
     dataset = dataset.shuffle(seed=42)
     dataset = dataset.select(range(args.num_samples)) if args.num_samples > 0 else dataset
-    all_samples = [prepare_arc_sample(sample) for sample in dataset]
+    all_samples = [prepare_dart_sample(sample) for sample in dataset]
     
     world_size = torch.cuda.device_count()
     chunk_size = math.ceil(len(all_samples) / world_size)
@@ -128,7 +149,7 @@ def main():
     processes = []
 
     for rank in range(world_size):
-        p = mp.Process(target=worker_evaluate, args=(rank, chunks[rank], return_dict, args.config))
+        p = mp.Process(target=worker_evaluate, args=(rank, chunks[rank], return_dict, args.config, DART_QUESTION_PREFIX))
         p.start()
         processes.append(p)
 
@@ -159,7 +180,7 @@ def main():
     print(f"Accuracy: {accuracy:.2f}")
     
     time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f"{yaml_config['runtime']['output_dir']}/arc_evaluation_{time_stamp}.json"
+    output_file = f"{yaml_config['runtime']['output_dir']}/dart_evaluation_{time_stamp}.json"
     with open(output_file, 'w') as f:
         json.dump(all_results, f, indent=4)
     return 0
