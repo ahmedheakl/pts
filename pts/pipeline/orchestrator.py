@@ -34,15 +34,18 @@ class PTSPipeline:
             llm = LLM(**cfg.llm.model_dump())
         return cls(cfg=cfg, diffusion=diffusion, llm=llm)
     
-    def generate_plan(self, user_prompt: str) -> Dict:
-        return self.diffusion.generate(prompt=user_prompt)
-            #user_prompt=user_prompt, system_prompt="")
+    def generate_plan(self, user_prompt: str, name_architecture:str ) -> Dict:
+        if name_architecture.startswith("llm"):
+            return self.llm.generate(
+                system_prompt=self.cfg.prompting.initial_system_msg, user_prompt=user_prompt)
+        else :
+            return self.diffusion.generate(prompt=user_prompt)
     
-    def generate_answer(self, user_prompt: str):
-        return self.llm.generate(
-            #prompt = user_prompt
-            self.cfg.prompting.final_system_msg , user_prompt = user_prompt
-        )
+    def generate_answer(self, user_prompt: str, name_architecture:str):
+        if name_architecture.startswith("llm"): #output answer with diffusion
+            return self.diffusion.generate(prompt=user_prompt)
+        else:
+            return self.llm.generate(self.cfg.prompting.final_system_msg , user_prompt = user_prompt)
 
     def run(self, user_prompt: str, extra_text: Optional[List[str]] = None,
             refine_with_llm: bool = False) -> Dict:

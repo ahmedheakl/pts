@@ -158,6 +158,7 @@ def worker_evaluate_llm(
     samples,
     return_dict,
     configs,
+    architecture_name,
     compare_func=compare_answers_arc,
     postfix=ARC_QUESTION_POSTFIX,
 ):
@@ -167,7 +168,7 @@ def worker_evaluate_llm(
     for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] LLM")):
         user_prompt = sample["input"]
         llm_input = user_prompt + postfix
-        out = pipeline.generate_answer(llm_input)
+        out = pipeline.generate_answer(llm_input, architecture_name)
         print(out["text"])
         local_results.append(
             {
@@ -185,8 +186,9 @@ def worker_evaluate(
     samples,
     return_dict,
     configs,
+    architecture_name,
     compare_func=compare_answers_arc,
-    postfix=ARC_QUESTION_POSTFIX,
+    postfix=ARC_QUESTION_POSTFIX, 
 ):
     torch.cuda.set_device(rank)
     pipeline = PTSPipeline.from_yaml(configs)
@@ -195,7 +197,7 @@ def worker_evaluate(
     for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] Diff")):
         user_prompt = sample["input"]
         diffusion_input = DIFFUSION_HTNTS_TEMPLATE.format(question=user_prompt)
-        plan = pipeline.generate_plan(diffusion_input)
+        plan = pipeline.generate_plan(diffusion_input, architecture_name)
         plan["question"] = user_prompt
         plan["correct"] = sample["correct"]
         plans.append(plan)
@@ -205,7 +207,7 @@ def worker_evaluate(
     for plan in tqdm(plans, desc="Running LLM refinement"):
         question = plan["question"]
         llm_input = LLM_TEMPLATE.format(question=question, plan=plan["text"]) + postfix
-        out = pipeline.generate_answer(llm_input)
+        out = pipeline.generate_answer(llm_input, architecture_name)
         print(out["text"])
         local_results.append(
             {
@@ -228,7 +230,7 @@ def parse_args():
     parser.add_argument("--llm_refine", action="store_true")
     parser.add_argument("--llm_eval", action="store_true")
     parser.add_argument("--num_samples", type=int, default=10)
-    parser.add_argument("--architecture_name", type=str, default="llm")
+    parser.add_argument("--architecture_name", type=str, default="llm-only")
     args = parser.parse_args()
     return args
 
@@ -283,7 +285,7 @@ def main():
     for rank in range(world_size):
         p = mp.Process(
             target=worker_func,
-            args=(rank, chunks[rank], return_dict, args.config, compare_func, prefix),
+            args=(rank, chunks[rank], return_dict, args.config, compare_func, prefix, args.architecture_name),
         )
         p.start()
         processes.append(p)

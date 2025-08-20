@@ -57,6 +57,7 @@ def parse_args():
     parser.add_argument("--split", default="test")
     parser.add_argument("--llm_refine", action="store_true")
     parser.add_argument("--num_samples", type=int, default=200)
+    parser.add_argument("--architecture_name", type=str, default="llm")
     args = parser.parse_args()
     return args
 
