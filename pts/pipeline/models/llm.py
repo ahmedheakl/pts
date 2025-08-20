@@ -2,6 +2,8 @@ from typing import Dict, Optional
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+import openai
+from typing import Dict, Optional
 
 
 class LLM:
@@ -49,6 +51,42 @@ class LLM:
 
         return {
             "text": generated_text.strip(),
+            "metadata": {
+                "model_id": self.model_id,
+                "device": self.device,
+                "max_new_tokens": self.max_new_tokens,
+                "temperature": self.temperature,
+                "do_sample": self.do_sample
+            }
+        }
+        
+        
+class LLM_GPT(LLM):
+    def __init__(self, api_key: str, model_id: str, device: str = "cuda:0", max_new_tokens: int = 512,
+                 temperature: float = 0.2, do_sample: bool = False, **kwargs):
+        self.api_key = api_key
+        openai.api_key = api_key
+        # Call parent constructor for shared attributes
+        super().__init__(model_id=model_id, device=device, max_new_tokens=max_new_tokens,
+                         temperature=temperature, do_sample=do_sample, **kwargs)
+
+    def generate(self, system_prompt: Optional[str], user_prompt: str) -> Dict:
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_prompt})
+
+        response = openai.ChatCompletion.create(
+            model=self.model_id,
+            messages=messages,
+            max_tokens=self.max_new_tokens,
+            temperature=self.temperature,
+        )
+
+        generated_text = response.choices[0].message.content.strip()
+
+        return {
+            "text": generated_text,
             "metadata": {
                 "model_id": self.model_id,
                 "device": self.device,

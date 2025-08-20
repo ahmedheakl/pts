@@ -5,7 +5,7 @@ import random
 import torch
 
 from .config import AppCfg
-from .models.llm import LLM
+from .models.llm import LLM, LLM_GPT
 from .models.diffusion import Diffusion
 from .concatenate import stitch
 from .utils import timestamp
@@ -17,7 +17,7 @@ class PTSPipeline:
     diffusion: Diffusion
 
     @classmethod
-    def from_yaml(cls, path: str):
+    def from_yaml(cls, path: str, use_gpt= False):
         with open(path, "r") as f:
             raw = yaml.safe_load(f)
         cfg = AppCfg(**raw)
@@ -26,16 +26,22 @@ class PTSPipeline:
         torch.manual_seed(cfg.runtime.seed)
         # models
         diffusion = Diffusion(**cfg.diffusion.model_dump())
-        llm = LLM(**cfg.llm.model_dump())
+        
+        if use_gpt :
+            llm_gpt = LLM_GPT(**cfg.llm.model_dump())
+            llm = llm_gpt
+        else :
+            llm = LLM(**cfg.llm.model_dump())
         return cls(cfg=cfg, diffusion=diffusion, llm=llm)
     
     def generate_plan(self, user_prompt: str) -> Dict:
-        return self.diffusion.generate(user_prompt)
+        return self.diffusion.generate(prompt=user_prompt)
+            #user_prompt=user_prompt, system_prompt="")
     
     def generate_answer(self, user_prompt: str):
         return self.llm.generate(
-            system_prompt=self.cfg.prompting.final_system_msg,
-            user_prompt=user_prompt
+            #prompt = user_prompt
+            self.cfg.prompting.final_system_msg , user_prompt = user_prompt
         )
 
     def run(self, user_prompt: str, extra_text: Optional[List[str]] = None,

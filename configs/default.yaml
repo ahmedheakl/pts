@@ -1,6 +1,6 @@
 # Model identifiers can be HF model ids or internal checkpoints.
 diffusion:
-  model_id: "GSAI-ML/LLaDA-8B-Instruct"
+  model_id: "GSAI-ML/LLaDA-8B-Instruct" #"Dream-org/Dream-v0-Instruct-7B" 
   device: "cuda:0"      # or "cpu"
   max_new_tokens: 256
 
@@ -11,6 +11,13 @@ llm:
   temperature: 0.2
   do_sample: false
 
+llm_gpt:
+  api_key: "sk-proj-ZgOe5wTJsYZGhtj43pORDYcyOl6TNmGBzRYgVy-Pif-nLGXuAhgwGBMDkUo4tvb-"
+  model_id: "gpt-4o"
+  max_new_tokens: 512
+  temperature:  0.2
+  do_sample: false
+
 runtime:
   output_dir: "outputs"
   json_prefix: "run"
@@ -18,7 +25,7 @@ runtime:
 
 prompting:
   # Template for the *final* LLM call that takes concatenated input
-  final_system_msg: "You are a graduate student."
+  final_system_msg: ""
   concat_header_plan: "## PLAN"
   concat_header_refined: "## REFINED PLAN"
   concat_header_extra: "## LLM Instructions"

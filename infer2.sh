@@ -7,6 +7,5 @@ set +a
 
 python -m pts.cli \
     --config configs/default.yaml \
-    --no-refine \
-    --number_samples 20 \
-    --name_architechture "diffusion-llm"
+    --no-refined \ 
+    --number_samples 20
