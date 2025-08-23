@@ -5,7 +5,7 @@ diffusion:
   max_new_tokens: 256
 
 llm:
-  model_id: "meta-llama/Llama-3.2-3B-Instruct"
+  model_id: "meta-llama/Llama-3.1-8B-Instruct"
   device: "cuda:1"
   max_new_tokens: 512
   temperature: 0.2

@@ -6,13 +6,14 @@ import math
 import json
 from datetime import datetime
 
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 import torch
 import torch.multiprocessing as mp
 from mathruler.grader import extract_boxed_content, grade_answer
 from pts.pipeline.orchestrator import PTSPipeline
 from pts.pipeline.utils import read_yaml
-
+from pts.constants import Pipelines
+import os
 
 ARC_QUESTION_PROMPT_TEMPLATE = """Question: {question}\n{choices_text}"""
 ARC_QUESTION_POSTFIX = """\nAnswer with a single letter (A, B, C, or D) and no explanation. Your answer should start with "Answer: " and be followed by the letter of the answer you choose. Do not include any other text in your response."""
@@ -92,17 +93,13 @@ def compare_answers_dart(predicted, correct):
     return 1.0 if grade_answer(pred_answer, correct) else 0.0
 
 
-
-
-
-#------------------------------------------------------------------------------------
-
-
+# ------------------------------------------------------------------------------------
 
 
 # Template used to prompt the model – GSM8K problems are just questions.
 # You can modify this (e.g. add "Answer:" or "Solve step by step") if desired.
 GSM8K_PROMPT_TEMPLATE = "{question}\n"
+
 
 def extract_numeric_answer(text: str) -> str:
     """
@@ -121,6 +118,7 @@ def extract_numeric_answer(text: str) -> str:
         answer = numbers[-1] if numbers else ""
     return answer.replace(",", "").strip()
 
+
 def compare_answers_gsm8k(predicted: str, correct: str) -> float:
     """
     Compare a model’s answer with the ground‑truth solution from GSM8K.
@@ -132,6 +130,7 @@ def compare_answers_gsm8k(predicted: str, correct: str) -> float:
     gold_answer = extract_numeric_answer(correct)
     return 1.0 if pred_answer and (pred_answer == gold_answer) else 0.0
 
+
 def prepare_gsm8k_sample(item: dict) -> dict:
     """
     Prepare a GSM8K sample for evaluation or model prompting.
@@ -140,20 +139,15 @@ def prepare_gsm8k_sample(item: dict) -> dict:
     answer string in `correct`.
     """
     question = item["question"]
-    answer   = item["answer"]
+    answer = item["answer"]
     input_text = GSM8K_PROMPT_TEMPLATE.format(question=question)
     return {"input": input_text, "correct": answer}
 
 
+# ------------------------------------------------------------------------------------
 
 
-
-
-
-#------------------------------------------------------------------------------------
-
-
-def worker_evaluate_llm(
+def worker_evaluate_single(
     rank: int,
     samples,
     return_dict,
@@ -165,7 +159,7 @@ def worker_evaluate_llm(
     torch.cuda.set_device(rank)
     pipeline = PTSPipeline.from_yaml(configs)
     local_results = []
-    for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] LLM")):
+    for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] Answer")):
         user_prompt = sample["input"]
         llm_input = user_prompt + postfix
         out = pipeline.generate_answer(llm_input, name_architecture)
@@ -188,26 +182,26 @@ def worker_evaluate(
     configs,
     name_architecture,
     compare_func=compare_answers_arc,
-    postfix=ARC_QUESTION_POSTFIX, 
+    postfix=ARC_QUESTION_POSTFIX,
 ):
     torch.cuda.set_device(rank)
     pipeline = PTSPipeline.from_yaml(configs)
     local_results = {}
     plans = []
-    for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] Diff")):
+    for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] Plan")):
         user_prompt = sample["input"]
         diffusion_input = DIFFUSION_HTNTS_TEMPLATE.format(question=user_prompt)
-        plan = pipeline.generate_plan(diffusion_input, name_architecture=name_architecture)
+        plan = pipeline.generate_plan(diffusion_input, name_architecture)
         plan["question"] = user_prompt
         plan["correct"] = sample["correct"]
         plans.append(plan)
         print(plan["text"])
 
     local_results = []
-    for plan in tqdm(plans, desc="Running LLM refinement"):
+    for plan in tqdm(plans, desc=f"[GPU {rank}] Answer"):
         question = plan["question"]
         llm_input = LLM_TEMPLATE.format(question=question, plan=plan["text"]) + postfix
-        out = pipeline.generate_answer(llm_input, name_architecture=name_architecture)
+        out = pipeline.generate_answer(llm_input, name_architecture)
         print(out["text"])
         local_results.append(
             {
@@ -222,34 +216,42 @@ def worker_evaluate(
 
 
 def parse_args():
-    parser = ArgumentParser(
-        description="Run evaluation on a dataset using the PTS pipeline"
-    )
+    parser = ArgumentParser()
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--dataset", default="allenai/ai2_arc")
-    parser.add_argument("--llm_refine", action="store_true")
-    parser.add_argument("--llm_eval", action="store_true")
     parser.add_argument("--num_samples", type=int, default=10)
-    parser.add_argument("--name_architecture", type=str, default="llm-only")
+    parser.add_argument("--ds_cache", type=str, default="cached_datasets")
+    parser.add_argument("--name_architecture", choices=Pipelines.all_architectures())
     args = parser.parse_args()
     return args
+
 
 def main():
     args = parse_args()
     print(f"Loading dataset {args.dataset}")
+    cache_path = os.path.join(args.ds_cache, args.dataset)
+    dataset = None
+    if os.path.exists(cache_path):
+        dataset = load_from_disk(cache_path)
     if args.dataset == "arc_easy":
-        dataset = load_dataset("allenai/ai2_arc", "ARC-Easy", split="test")
+        if not dataset:
+            dataset = load_dataset("allenai/ai2_arc", "ARC-Easy", split="test")
+            dataset.save_to_disk(cache_path)
         process_func = prepare_arc_sample
         compare_func = compare_answers_arc
         prefix = ARC_QUESTION_POSTFIX
     elif args.dataset == "arc_challenge":
-        dataset = load_dataset("allenai/ai2_arc", "ARC-Challenge", split="test")
+        if not dataset:
+            dataset = load_dataset("allenai/ai2_arc", "ARC-Challenge", split="test")
+            dataset.save_to_disk(cache_path)
         process_func = prepare_arc_sample
         compare_func = compare_answers_arc
         prefix = ARC_QUESTION_POSTFIX
     elif "dart" in args.dataset:
+        if not dataset:
+            dataset = load_dataset("hkust-nlp/dart-math-pool-math", split="train")
+            dataset.save_to_disk(cache_path)
         level = int(args.dataset.split("-")[-1])
-        dataset = load_dataset("hkust-nlp/dart-math-pool-math", split="train")
         dataset = dataset.filter(
             lambda x: x["query_metadata"]["level"] == level, num_proc=32
         )
@@ -257,7 +259,9 @@ def main():
         compare_func = compare_answers_dart
         prefix = DART_QUESTION_PREFIX
     elif "gsm8k" in args.dataset:
-        dataset = load_dataset("gsm8k", "main", split="test")
+        if not dataset:
+            dataset = load_dataset("gsm8k", "main", split="test")
+            dataset.save_to_disk(cache_path)
         process_func = prepare_gsm8k_sample
         compare_func = compare_answers_gsm8k
         prefix = ""  # GSM8K does not need a postfix
@@ -279,12 +283,22 @@ def main():
     manager = mp.Manager()
     return_dict = manager.dict()
     processes = []
-    worker_func = worker_evaluate_llm if args.llm_eval else worker_evaluate
+    worker_func = (
+        worker_evaluate_single if "only" in args.name_architecture else worker_evaluate
+    )
 
     for rank in range(world_size):
         p = mp.Process(
             target=worker_func,
-            args=(rank, chunks[rank], return_dict, args.config, args.name_architecture, compare_func, prefix),
+            args=(
+                rank,
+                chunks[rank],
+                return_dict,
+                args.config,
+                args.name_architecture,
+                compare_func,
+                prefix,
+            ),
         )
         p.start()
         processes.append(p)
@@ -302,13 +316,12 @@ def main():
     all_results = {
         "diffusion_model": yaml_config["diffusion"]["model_id"],
         "llm": yaml_config["llm"]["model_id"],
-        "name_architecture" : args.name_architecture,
+        "name_architecture": args.name_architecture,
         "dataset": args.dataset,
         "num_samples": len(all_samples),
         "accuracy": accuracy,
-        "is_llm": args.llm_eval,
-        "diffusion_template": DIFFUSION_HTNTS_TEMPLATE,
-        "llm_template": LLM_TEMPLATE,
+        "plan_template": DIFFUSION_HTNTS_TEMPLATE,
+        "answer_template": LLM_TEMPLATE,
         "diffusion_max_new_tokens": yaml_config["diffusion"]["max_new_tokens"],
         "llm_max_new_tokens": yaml_config["llm"]["max_new_tokens"],
         "results": all_results,
@@ -316,16 +329,11 @@ def main():
     print(f"Accuracy: {accuracy:.2f}")
 
     time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    if "dart" in args.dataset:
-        dataset_name = "dart"
-    elif "gsm8k" in args.dataset:
-        dataset_name = "gsm8k"
-    else:
-        dataset_name = "arc"
-    output_file = f"{yaml_config['runtime']['output_dir']}/{args.name_architecture}/{dataset_name}_evaluation_{time_stamp}_{args.name_architecture}.json"
+    output_file = f"{yaml_config['runtime']['output_dir']}/{args.name_architecture}/{args.dataset}_evaluation_{time_stamp}_{args.name_architecture}.json"
     with open(output_file, "w") as f:
         json.dump(all_results, f, indent=4)
     return 0
+
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
