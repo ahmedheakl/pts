@@ -12,7 +12,6 @@ llm:
   do_sample: false
 
 llm_gpt:
-  api_key: "sk-proj-ZgOe5wTJsYZGhtj43pORDYcyOl6TNmGBzRYgVy-Pif-nLGXuAhgwGBMDkUo4tvb-"
   model_id: "gpt-4o"
   max_new_tokens: 512
   temperature:  0.2

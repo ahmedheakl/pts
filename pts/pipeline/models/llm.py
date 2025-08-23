@@ -3,8 +3,6 @@ from typing import Dict, Optional
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import openai
-from typing import Dict, Optional
-
 
 class LLM:
     def __init__(self, model_id: str, device: str = "cuda:0", max_new_tokens: int = 512,
@@ -18,16 +16,11 @@ class LLM:
         self.model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map="auto").eval()
         
 
-    def generate(self, system_prompt: Optional[str], user_prompt: str) -> Dict:
-        if system_prompt:
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
-        else:
-            messages = [{"role": "user", "content": user_prompt}]
-
-        # Apply chat template and tokenize
+    def generate(self, user_prompt: str, system_prompt=None) -> Dict:
+        messages = []
+        if system_prompt: 
+            messages += [{"role": "system", "content": system_prompt}]
+        messages += [{"role": "user", "content": user_prompt}]
         inputs = self.tokenizer.apply_chat_template(
             messages,
             add_generation_prompt=True,
@@ -35,8 +28,7 @@ class LLM:
             return_dict=True,
             return_tensors="pt",
         ).to("cuda")
-
-        # Generate output
+        input_len = inputs["input_ids"].shape[-1]
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
@@ -46,8 +38,7 @@ class LLM:
                 pad_token_id=self.tokenizer.eos_token_id
             )
 
-        # Decode the output tokens
-        generated_text = self.tokenizer.decode(outputs[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
+        generated_text = self.tokenizer.decode(outputs[0][input_len:], skip_special_tokens=True)
 
         return {
             "text": generated_text.strip(),
@@ -61,14 +52,13 @@ class LLM:
         }
         
         
-class LLM_GPT(LLM):
-    def __init__(self, api_key: str, model_id: str, device: str = "cuda:0", max_new_tokens: int = 512,
+class LLM_GPT:
+    def __init__(self, model_id: str, max_new_tokens: int = 512,
                  temperature: float = 0.2, do_sample: bool = False, **kwargs):
-        self.api_key = api_key
-        openai.api_key = api_key
-        # Call parent constructor for shared attributes
-        super().__init__(model_id=model_id, device=device, max_new_tokens=max_new_tokens,
-                         temperature=temperature, do_sample=do_sample, **kwargs)
+        self.model_id = model_id
+        self.max_new_tokens = max_new_tokens
+        self.temperature = temperature
+        self.do_sample = do_sample
 
     def generate(self, system_prompt: Optional[str], user_prompt: str) -> Dict:
         messages = []

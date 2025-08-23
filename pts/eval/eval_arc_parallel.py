@@ -158,7 +158,7 @@ def worker_evaluate_llm(
     samples,
     return_dict,
     configs,
-    architecture_name,
+    name_architecture,
     compare_func=compare_answers_arc,
     postfix=ARC_QUESTION_POSTFIX,
 ):
@@ -168,7 +168,7 @@ def worker_evaluate_llm(
     for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] LLM")):
         user_prompt = sample["input"]
         llm_input = user_prompt + postfix
-        out = pipeline.generate_answer(llm_input, architecture_name)
+        out = pipeline.generate_answer(llm_input, name_architecture)
         print(out["text"])
         local_results.append(
             {
@@ -186,7 +186,7 @@ def worker_evaluate(
     samples,
     return_dict,
     configs,
-    architecture_name,
+    name_architecture,
     compare_func=compare_answers_arc,
     postfix=ARC_QUESTION_POSTFIX, 
 ):
@@ -197,7 +197,7 @@ def worker_evaluate(
     for i, sample in enumerate(tqdm(samples, desc=f"[GPU {rank}] Diff")):
         user_prompt = sample["input"]
         diffusion_input = DIFFUSION_HTNTS_TEMPLATE.format(question=user_prompt)
-        plan = pipeline.generate_plan(diffusion_input, architecture_name)
+        plan = pipeline.generate_plan(diffusion_input, name_architecture=name_architecture)
         plan["question"] = user_prompt
         plan["correct"] = sample["correct"]
         plans.append(plan)
@@ -207,7 +207,7 @@ def worker_evaluate(
     for plan in tqdm(plans, desc="Running LLM refinement"):
         question = plan["question"]
         llm_input = LLM_TEMPLATE.format(question=question, plan=plan["text"]) + postfix
-        out = pipeline.generate_answer(llm_input, architecture_name)
+        out = pipeline.generate_answer(llm_input, name_architecture=name_architecture)
         print(out["text"])
         local_results.append(
             {
@@ -230,7 +230,7 @@ def parse_args():
     parser.add_argument("--llm_refine", action="store_true")
     parser.add_argument("--llm_eval", action="store_true")
     parser.add_argument("--num_samples", type=int, default=10)
-    parser.add_argument("--architecture_name", type=str, default="llm-only")
+    parser.add_argument("--name_architecture", type=str, default="llm-only")
     args = parser.parse_args()
     return args
 
@@ -280,12 +280,11 @@ def main():
     return_dict = manager.dict()
     processes = []
     worker_func = worker_evaluate_llm if args.llm_eval else worker_evaluate
-    print(f"worker_func = {worker_func}")
 
     for rank in range(world_size):
         p = mp.Process(
             target=worker_func,
-            args=(rank, chunks[rank], return_dict, args.config, compare_func, prefix, args.architecture_name),
+            args=(rank, chunks[rank], return_dict, args.config, args.name_architecture, compare_func, prefix),
         )
         p.start()
         processes.append(p)
@@ -303,7 +302,7 @@ def main():
     all_results = {
         "diffusion_model": yaml_config["diffusion"]["model_id"],
         "llm": yaml_config["llm"]["model_id"],
-        "architecture_name" : args.architecture_name,
+        "name_architecture" : args.name_architecture,
         "dataset": args.dataset,
         "num_samples": len(all_samples),
         "accuracy": accuracy,
@@ -323,7 +322,7 @@ def main():
         dataset_name = "gsm8k"
     else:
         dataset_name = "arc"
-    output_file = f"{yaml_config['runtime']['output_dir']}/{args.architecture_name}/{dataset_name}_evaluation_{time_stamp}_{args.architecture_name}.json"
+    output_file = f"{yaml_config['runtime']['output_dir']}/{args.name_architecture}/{dataset_name}_evaluation_{time_stamp}_{args.name_architecture}.json"
     with open(output_file, "w") as f:
         json.dump(all_results, f, indent=4)
     return 0
