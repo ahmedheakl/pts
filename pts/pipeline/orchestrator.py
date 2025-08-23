@@ -9,6 +9,8 @@ from .models.llm import LLM, LLM_GPT
 from .models.diffusion import Diffusion
 from .concatenate import stitch
 from .utils import timestamp
+from pts.constants import Pipelines
+
 
 @dataclass
 class PTSPipeline:
@@ -17,7 +19,7 @@ class PTSPipeline:
     diffusion: Diffusion
 
     @classmethod
-    def from_yaml(cls, path: str, use_gpt= False):
+    def from_yaml(cls, path: str, use_gpt=False):
         with open(path, "r") as f:
             raw = yaml.safe_load(f)
         cfg = AppCfg(**raw)
@@ -26,30 +28,34 @@ class PTSPipeline:
         torch.manual_seed(cfg.runtime.seed)
         # models
         diffusion = Diffusion(**cfg.diffusion.model_dump())
-        
-        if use_gpt :
+
+        if use_gpt:
             llm_gpt = LLM_GPT(**cfg.llm_gpt.model_dump())
             llm = llm_gpt
-        else :
+        else:
             llm = LLM(**cfg.llm.model_dump())
         return cls(cfg=cfg, diffusion=diffusion, llm=llm)
-    
-    def generate_plan(self, user_prompt: str, name_architecture:str ) -> Dict:
-        if name_architecture.startswith("llm"):
+
+    def generate_plan(self, user_prompt: str, name_architecture: str) -> Dict:
+        if name_architecture in Pipelines.llm_plan():
             return self.llm.generate(user_prompt=user_prompt)
-        else :
+        elif name_architecture in Pipelines.diffusion_plan():
             return self.diffusion.generate(prompt=user_prompt)
-    
-    def generate_answer(self, user_prompt: str, name_architecture:str):
-        if name_architecture=="llm-diffusion": #diffusion answers
-                return self.diffusion.generate(prompt=user_prompt)
-        if name_architecture=="diffusion-llm": #llm answers
+        raise ValueError(f"Unknown architecture name: {name_architecture}")
+
+    def generate_answer(self, user_prompt: str, name_architecture: str):
+        if name_architecture in Pipelines.diffusion_answer():
+            return self.diffusion.generate(prompt=user_prompt)
+        if name_architecture in Pipelines.llm_answer():
             return self.llm.generate(user_prompt=user_prompt)
         raise ValueError(f"Unknown architecture name: {name_architecture}")
-            
 
-    def run(self, user_prompt: str, extra_text: Optional[List[str]] = None,
-            refine_with_llm: bool = False) -> Dict:
+    def run(
+        self,
+        user_prompt: str,
+        extra_text: Optional[List[str]] = None,
+        refine_with_llm: bool = False,
+    ) -> Dict:
         # 1) diffusion produces plan/structure
         plan = self.diffusion.generate(user_prompt)
         plan_text = plan["text"]
@@ -59,7 +65,7 @@ class PTSPipeline:
         if refine_with_llm:
             refined = self.llm.generate(
                 system_prompt="You rewrite plans into crisp bullet points.",
-                user_prompt=f"Rewrite the following plan more clearly:\n\n{plan_text}"
+                user_prompt=f"Rewrite the following plan more clearly:\n\n{plan_text}",
             )
             refined_text = refined["text"]
 
@@ -68,41 +74,30 @@ class PTSPipeline:
             plan=plan_text,
             refined=refined_text,
             extras=extra_text or [],
-            headers=self.cfg.prompting
+            headers=self.cfg.prompting,
         )
 
         final = self.llm.generate(
-            system_prompt=self.cfg.prompting.final_system_msg,
-            user_prompt=f"{combined}"
+            system_prompt=self.cfg.prompting.final_system_msg, user_prompt=f"{combined}"
         )
 
         # 4) JSON result
         result = {
             "timestamp": timestamp(),
-            "input": {
-                "prompt": user_prompt,
-                "extra_text": extra_text or []
-            },
-            "diffusion_output": {
-                "text": plan_text,
-                "metadata": plan["metadata"]
-            },
+            "input": {"prompt": user_prompt, "extra_text": extra_text or []},
+            "diffusion_output": {"text": plan_text, "metadata": plan["metadata"]},
             "llm_stage1_output": {
                 "text": refined_text,
-                "metadata": None if not refine_with_llm else {
+                "metadata": None
+                if not refine_with_llm
+                else {
                     "model_id": self.llm.model_id,
-                    "max_new_tokens": self.llm.max_new_tokens
-                }
+                    "max_new_tokens": self.llm.max_new_tokens,
+                },
             },
             "combined_input": combined,
-            "final_output": {
-                "text": final["text"],
-                "metadata": final["metadata"]
-            },
-            "models": {
-                "diffusion": plan["metadata"],
-                "llm": final["metadata"]
-            }
+            "final_output": {"text": final["text"], "metadata": final["metadata"]},
+            "models": {"diffusion": plan["metadata"], "llm": final["metadata"]},
         }
         # path = save_json(result, self.cfg.runtime.output_dir, self.cfg.runtime.json_prefix)
         # result["saved_path"] = path
