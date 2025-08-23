@@ -15,6 +15,7 @@ from pts.eval.metrics.essay_metrics import (
     D3,
     R4,
     LR_n,
+    evaluate_perplexity
 )
 
 
@@ -53,6 +54,7 @@ def evaluate_essay(essay: str) -> dict:
     scores["R4"] = R4(essay)
     scores["LR2"] = LR_n(essay, n=2)
     scores["LR3"] = LR_n(essay, n=3)
+    scores['perplexity'] = evaluate_perplexity(essay, model_name="gpt2")
     return scores
 
 def worker_evaluate(
@@ -152,7 +154,7 @@ def main():
         all_results.extend(return_dict[rank])
 
     yaml_config = read_yaml(args.config)
-    metric_keys = ["Task Achievement", "Coherence and Cohesion", "Vocabulary", "Grammar", "Overall", "D3", "R4", "LR2", "LR3"]
+    metric_keys = ["Task Achievement", "Coherence and Cohesion", "Vocabulary", "Grammar", "Overall", "D3", "R4", "LR2", "LR3", "perplexity"]
     def acc(key):
         return sum(r[key] for r in all_results) / len(all_results)
     r = {key: acc(key) for key in metric_keys}

@@ -1,7 +1,7 @@
 
 import torch
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForCausalLM
 import re
 from collections import Counter
 from typing import List, Tuple
@@ -106,15 +106,14 @@ def evaluate_average_sentence_length(essay: str) -> float:
 	word_counts = [len(s.split()) for s in sentences]
 	return sum(word_counts) / len(sentences)
 
-# TODO: fix perplexity evaluation, it should be the model evaluated on the essay
-# def evaluate_perplexity(essay: str, model_name: str = "gpt2") -> float:
-# 	lm_tokenizer = AutoTokenizer.from_pretrained(model_name)
-# 	lm_model = AutoModelForCausalLM.from_pretrained(model_name)
-# 	input_ids = lm_tokenizer(essay, return_tensors="pt").input_ids
-# 	with torch.no_grad():
-# 		outputs = lm_model(input_ids, labels=input_ids)
-# 		loss = outputs.loss
-# 	return float(torch.exp(loss).item())
+def evaluate_perplexity(essay: str, model_name: str = "gpt2") -> float:
+	lm_tokenizer = AutoTokenizer.from_pretrained(model_name)
+	lm_model = AutoModelForCausalLM.from_pretrained(model_name)
+	input_ids = lm_tokenizer(essay, return_tensors="pt").input_ids
+	with torch.no_grad():
+		outputs = lm_model(input_ids, labels=input_ids)
+		loss = outputs.loss
+	return float(torch.exp(loss).item())
 
 
 
