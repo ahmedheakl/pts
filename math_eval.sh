@@ -1,3 +1,4 @@
+cd /home/abdulrahman.mahmoud/HEAKL/PTS
 source ~/.bashrc
 conda activate arina-cass
 

@@ -1,6 +1,8 @@
 # Custom
 outputs
 outputs_essay
+qwen3-4b-arg-quality
+ielts_evaluator_checkpoint
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
