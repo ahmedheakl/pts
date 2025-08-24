@@ -4,6 +4,7 @@ outputs_essay
 qwen3-4b-arg-quality
 ielts_evaluator_checkpoint
 cached_datasets
+logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
