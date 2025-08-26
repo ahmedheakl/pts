@@ -16,7 +16,7 @@ from pts.constants import Pipelines
 import os
 
 ARC_QUESTION_PROMPT_TEMPLATE = """Question: {question}\n{choices_text}"""
-ARC_QUESTION_POSTFIX = """\nAnswer with a single letter (A, B, C, or D) and no explanation. Your answer should start with "Answer: " and be followed by the letter of the answer you choose. Do not include any other text in your response."""
+MCQ_QUESTION_POSTFIX = """\nAnswer with a single letter (A, B, C, or D) and no explanation. Your answer should start with "Answer: " and be followed by the letter of the answer you choose. Do not include any other text in your response."""
 
 DART_QUESTION_PROMPT_TEMPLATE = """Question: {question}"""
 DART_QUESTION_PREFIX = (
@@ -79,7 +79,7 @@ def prepare_arc_sample(item):
     return {"input": input_text, "correct": answer_key}
 
 
-def compare_answers_arc(predicted, correct):
+def compare_answers_mcq(predicted, correct):
     pred_answer = re.match(r"^(?:Answer:\s*)?([A-Da-d])\.?$", predicted.strip())
     if not pred_answer:
         return 0.0
@@ -102,47 +102,34 @@ GSM8K_PROMPT_TEMPLATE = "{question}\n"
 
 
 def extract_numeric_answer(text: str) -> str:
-    """
-    Extract the final numeric answer from a GSM8K answer string or a model’s output.
-    The GSM8K ground‑truth puts the answer after a `####` token:contentReference[oaicite:2]{index=2},
-    so we first look for that.  If it’s missing (e.g. in a model’s answer), we fall back
-    to picking the last number in the text.  Commas are removed so that '70,000' == '70000'.
-    """
-    # Look for a number following '####'
     match = re.search(r"####\s*([-+]?[0-9][\d,\.]*)", text)
     if match:
         answer = match.group(1)
     else:
-        # Otherwise take the last standalone number in the string
         numbers = re.findall(r"-?\d+(?:\.\d+)?", text)
         answer = numbers[-1] if numbers else ""
     return answer.replace(",", "").strip()
 
 
 def compare_answers_gsm8k(predicted: str, correct: str) -> float:
-    """
-    Compare a model’s answer with the ground‑truth solution from GSM8K.
-    Both arguments are strings; the ground‑truth string contains the full explanation
-    and final answer:contentReference[oaicite:3]{index=3}.  Returns 1.0 if the extracted numeric
-    answers match, 0.0 otherwise.
-    """
     pred_answer = extract_numeric_answer(predicted)
     gold_answer = extract_numeric_answer(correct)
     return 1.0 if pred_answer and (pred_answer == gold_answer) else 0.0
 
 
 def prepare_gsm8k_sample(item: dict) -> dict:
-    """
-    Prepare a GSM8K sample for evaluation or model prompting.
-    `item` is a dict with keys 'question' and 'answer'.
-    Returns a dict with the formatted prompt in `input` and the full ground‑truth
-    answer string in `correct`.
-    """
     question = item["question"]
     answer = item["answer"]
     input_text = GSM8K_PROMPT_TEMPLATE.format(question=question)
     return {"input": input_text, "correct": answer}
 
+def prepare_mmlu_sample(item):
+    question = item['question']
+    choices = item['choices']
+    prompt = f"{question.strip()}\nA. {choices[0]}\nB. {choices[1]}\nC. {choices[2]}\nD. {choices[3]}\nAnswer:"
+    answer_id = item['answer']
+    answer = chr(ord('A')+answer_id)
+    return {"input": prompt, "correct": answer}
 
 # ------------------------------------------------------------------------------------
 
@@ -153,8 +140,8 @@ def worker_evaluate_single(
     return_dict,
     configs,
     name_architecture,
-    compare_func=compare_answers_arc,
-    postfix=ARC_QUESTION_POSTFIX,
+    compare_func=compare_answers_mcq,
+    postfix=MCQ_QUESTION_POSTFIX,
 ):
     torch.cuda.set_device(rank)
     pipeline = PTSPipeline.from_yaml(configs)
@@ -181,8 +168,8 @@ def worker_evaluate(
     return_dict,
     configs,
     name_architecture,
-    compare_func=compare_answers_arc,
-    postfix=ARC_QUESTION_POSTFIX,
+    compare_func=compare_answers_mcq,
+    postfix=MCQ_QUESTION_POSTFIX,
 ):
     torch.cuda.set_device(rank)
     pipeline = PTSPipeline.from_yaml(configs)
@@ -218,7 +205,7 @@ def worker_evaluate(
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument("--config", default="configs/default.yaml")
-    parser.add_argument("--dataset", default="allenai/ai2_arc")
+    parser.add_argument("--dataset", default="arc_easy")
     parser.add_argument("--num_samples", type=int, default=10)
     parser.add_argument("--ds_cache", type=str, default="cached_datasets")
     parser.add_argument("--name_architecture", choices=Pipelines.all_architectures())
@@ -238,15 +225,15 @@ def main():
             dataset = load_dataset("allenai/ai2_arc", "ARC-Easy", split="test")
             dataset.save_to_disk(cache_path)
         process_func = prepare_arc_sample
-        compare_func = compare_answers_arc
-        prefix = ARC_QUESTION_POSTFIX
+        compare_func = compare_answers_mcq
+        prefix = MCQ_QUESTION_POSTFIX
     elif args.dataset == "arc_challenge":
         if not dataset:
             dataset = load_dataset("allenai/ai2_arc", "ARC-Challenge", split="test")
             dataset.save_to_disk(cache_path)
         process_func = prepare_arc_sample
-        compare_func = compare_answers_arc
-        prefix = ARC_QUESTION_POSTFIX
+        compare_func = compare_answers_mcq
+        prefix = MCQ_QUESTION_POSTFIX
     elif "dart" in args.dataset:
         if not dataset:
             dataset = load_dataset("hkust-nlp/dart-math-pool-math", split="train")
@@ -265,6 +252,13 @@ def main():
         process_func = prepare_gsm8k_sample
         compare_func = compare_answers_gsm8k
         prefix = ""  # GSM8K does not need a postfix
+    elif "mmlu" in args.dataset:
+        if not dataset:
+            dataset = load_dataset("cais/mmlu", "all", split="test")
+            dataset.save_to_disk(cache_path)
+        process_func = prepare_mmlu_sample
+        compare_func = compare_answers_mcq
+        prefix = MCQ_QUESTION_POSTFIX
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset}")
 

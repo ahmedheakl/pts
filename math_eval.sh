@@ -7,10 +7,10 @@ source .env
 set +a
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
-for name_architecture in "diffusion-llm" "llm-diffusion" "llm-only" "llm-llm"; do
-    for src_subset in "arc_easy" "arc_challenge" "dart-1" "dart-2" "dart-3" "dart-4" "dart-5" "gsm8k"; do
+for name_architecture in "diffusion-diffusion" "diffusion-llm" "llm-diffusion" "diffusion-only" "llm-only" "llm-llm"; do
+    for src_subset in "mmlu"; do
         python pts/eval/eval_arc_parallel.py \
-            --config configs/default.yaml \
+            --config configs/llada_llama.yaml \
             --dataset $src_subset \
             --num_samples 200 \
             --name_architecture "$name_architecture"
