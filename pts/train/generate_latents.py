@@ -196,7 +196,7 @@ def parse_args():
 def main():
     args = parse_args()
     print(f"Loading {args.dataset} ...")
-    ds_cache = os.path.join("cached_datasets", args.dataset)
+    ds_cache = os.path.join("/l/users/abdulrahman.mahmoud/heakl/PTS/cached_datasets", args.dataset)
     if os.path.exists(ds_cache):
         dataset = load_from_disk(ds_cache)
     if args.dataset == "arc_easy":

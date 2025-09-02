@@ -5,6 +5,7 @@ import re
 import math
 import json
 from datetime import datetime
+from functools import partial
 
 from datasets import load_dataset, load_from_disk
 import torch
@@ -97,32 +98,56 @@ def compare_answers_dart(predicted, correct):
 
 
 # Template used to prompt the model – GSM8K problems are just questions.
-# You can modify this (e.g. add "Answer:" or "Solve step by step") if desired.
-GSM8K_PROMPT_TEMPLATE = "{question}\n"
+GSM8K_PROMPT_TEMPLATE = "Question: {question}\nAnswer:\n"
+GSM8K_FEWSHOT_K = 5
+
+def _format_gsm8k_example(q, a):
+    return f"Question: {q}\nAnswer:\n{a}\n\n"
+# FEW SHOTS: recommended : 5
+def build_gsm8k_fewshot_prefix(train_ds, k=GSM8K_FEWSHOT_K):
+    examples = train_ds.shuffle(seed=42).select(range(k))
+    parts = []
+    for ex in examples:
+        parts.append(_format_gsm8k_example(ex["question"], ex["answer"]))
+    return "".join(parts)
 
 
-def extract_numeric_answer(text: str) -> str:
-    match = re.search(r"####\s*([-+]?[0-9][\d,\.]*)", text)
-    if match:
-        answer = match.group(1)
-    else:
-        numbers = re.findall(r"-?\d+(?:\.\d+)?", text)
-        answer = numbers[-1] if numbers else ""
-    return answer.replace(",", "").strip()
 
+def prepare_gsm8k_sample(item: dict, fewshot_prefix: str = "") -> dict:
+    question = item["question"]
+    answer = item["answer"]
+    input_text = fewshot_prefix + GSM8K_PROMPT_TEMPLATE.format(question=question)
+    return {"input": input_text, "correct": answer}
 
 def compare_answers_gsm8k(predicted: str, correct: str) -> float:
-    pred_answer = extract_numeric_answer(predicted)
-    gold_answer = extract_numeric_answer(correct)
+    def _extract_numeric_answer(text: str) -> str:
+        match = re.search(r"####\s*([-+]?[0-9][\d,\.]*)", text)
+        if match:
+            answer = match.group(1)
+        else:
+            numbers = re.findall(r"-?\d+(?:\.\d+)?", text)
+            answer = numbers[-1] if numbers else "" # take the last number found
+        # cleaning
+        answer = (
+            answer.replace(",", "")  # remove commas
+                .replace("$", "")  # remove dollar signs
+                .strip()           # remove whitespace
+        )
+        # remove potential "#### " at the beginning 
+        answer = re.sub(r"^####\s*", "", answer)
+        # remove a trailing period
+        answer = re.sub(r"\.$", "", answer)
+        return answer
+    
+    pred_answer = _extract_numeric_answer(predicted)
+    gold_answer = _extract_numeric_answer(correct)
     return 1.0 if pred_answer and (pred_answer == gold_answer) else 0.0
 
 
-def prepare_gsm8k_sample(item: dict) -> dict:
-    question = item["question"]
-    answer = item["answer"]
-    input_text = GSM8K_PROMPT_TEMPLATE.format(question=question)
-    return {"input": input_text, "correct": answer}
 
+
+#---------------------------------------------------------------------
+ 
 def prepare_mmlu_sample(item):
     question = item['question']
     choices = item['choices']
@@ -207,7 +232,7 @@ def parse_args():
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--dataset", default="arc_easy")
     parser.add_argument("--num_samples", type=int, default=10)
-    parser.add_argument("--ds_cache", type=str, default="cached_datasets")
+    parser.add_argument("--ds_cache", type=str, default="/l/users/abdulrahman.mahmoud/heakl/cached_datasets")
     parser.add_argument("--name_architecture", choices=Pipelines.all_architectures())
     args = parser.parse_args()
     return args
@@ -247,11 +272,18 @@ def main():
         prefix = DART_QUESTION_PREFIX
     elif "gsm8k" in args.dataset:
         if not dataset:
-            dataset = load_dataset("gsm8k", "main", split="test")
-            dataset.save_to_disk(cache_path)
-        process_func = prepare_gsm8k_sample
+            test_ds = load_dataset("gsm8k", "main", split="test")
+            train_ds = load_dataset("gsm8k", "main", split="train")
+            test_ds.save_to_disk(cache_path)  #cache the test data
+        else:
+            test_ds = dataset
+            train_ds = load_dataset("gsm8k", "main", split="train")
+            
+        fewshot_prefix = build_gsm8k_fewshot_prefix(train_ds, k=GSM8K_FEWSHOT_K)
+        process_func = partial(prepare_gsm8k_sample, fewshot_prefix=fewshot_prefix)
         compare_func = compare_answers_gsm8k
         prefix = ""  # GSM8K does not need a postfix
+        dataset = test_ds
     elif "mmlu" in args.dataset:
         if not dataset:
             dataset = load_dataset("cais/mmlu", "all", split="test")

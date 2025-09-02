@@ -143,7 +143,7 @@ def parse_args():
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--dataset", default="ielts-essays")
     parser.add_argument("--num_samples", type=int, default=10)
-    parser.add_argument("--ds_cache", type=str, default="cached_datasets")
+    parser.add_argument("--ds_cache", type=str, default="/l/users/abdulrahman.mahmoud/heakl/PTS/cached_datasets")
     parser.add_argument("--name_architecture", choices=Pipelines.all_architectures())
     args = parser.parse_args()
     return args

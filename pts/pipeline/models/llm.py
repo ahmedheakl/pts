@@ -6,7 +6,7 @@ import openai
 
 class LLM:
     def __init__(self, model_id: str, device: str = "cuda:0", max_new_tokens: int = 512,
-                 temperature: float = 0.2, do_sample: bool = False, **kwargs):
+                 temperature: float = 0, do_sample: bool = False, **kwargs):
         self.model_id = model_id
         self.device = device
         self.max_new_tokens = max_new_tokens

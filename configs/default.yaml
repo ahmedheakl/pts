@@ -8,13 +8,13 @@ llm:
   model_id: "Qwen/Qwen2.5-7B-Instruct"
   device: "cuda:1"
   max_new_tokens: 512
-  temperature: 0.2
+  temperature: 0
   do_sample: false
 
 llm_gpt:
   model_id: "gpt-4o"
   max_new_tokens: 512
-  temperature:  0.2
+  temperature:  0
   do_sample: false
 
 runtime:
