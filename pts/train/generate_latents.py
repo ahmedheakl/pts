@@ -1,4 +1,5 @@
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoTokenizer
+
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -6,6 +7,7 @@ from datasets import load_dataset, load_from_disk
 from tqdm import tqdm
 import os
 from datetime import datetime
+from pts.pipeline.models.modeling_llada import LLaDAModelLM
 
 dataset_names = ["arc_easy", "arc_challenge", "dart-1", "dart-2", "dart-3", "dart-4", "dart-5", "gsm8k"] 
 ARC_QUESTION_PROMPT_TEMPLATE = """Question: {question}\n{choices_text}"""
@@ -38,12 +40,11 @@ Question (stem only):
 GSM8K_PROMPT_TEMPLATE = "{question}\n"
 
 model_id = "GSAI-ML/LLaDA-8B-Instruct"
-model = AutoModel.from_pretrained(
+model = LLaDAModelLM.from_pretrained(
     model_id, 
     trust_remote_code=True, 
     torch_dtype=torch.bfloat16, 
-    device_map="auto",
-).eval()
+).to("cuda").eval()
 tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 
 def add_gumbel_noise(logits, temperature):
@@ -224,7 +225,8 @@ def main():
         process_func = prepare_gsm8k_sample
         prefix = ""
     if args.num_samples > 0:
-        dataset = dataset.select(range(args.num_samples))
+        num_samples = min(args.num_samples, len(dataset))
+        dataset = dataset.select(range(num_samples))
     latent_dataset = []
     for d in tqdm(dataset, desc=f"Processing {args.dataset}"):
         sample = process_func(d)
@@ -259,7 +261,7 @@ def main():
             }
         })
         
-    output_dir = "outputs/train"
+    output_dir = "outputs/train_5x"
     os.makedirs(output_dir, exist_ok=True)
     time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     outputs_path = f"{output_dir}/{args.dataset}_{time_stamp}_latents.npy"

@@ -18,7 +18,7 @@ from pts.pipeline.orchestrator import PTSPipeline
 from pts.pipeline.utils import read_yaml
 from pts.constants import Pipelines
 from pts.eval.compare_prepare.aime import compare_answers_aime, prepare_aime_sample
-from pts.eval.compare_prepare.truthfulQA import compare_answers_truthqa, prepare_truthfulqa_sample
+
 
 ARC_QUESTION_PROMPT_TEMPLATE = """Question: {question}\n{choices_text}"""
 MCQ_QUESTION_POSTFIX = """\nAnswer with a single letter (A, B, C, or D) and no explanation. Your answer should start with "Answer: " and be followed by the letter of the answer you choose. Do not include any other text in your response."""
@@ -94,18 +94,15 @@ def compare_answers_mcq(predicted, correct):
 
 
 def compare_answers_dart(pred, gt):
-    if '\\boxed{' not in pred:
-        pred = f"\\boxed{{{pred}}}"
-    if '\\boxed{' not in gt:
-        gt = f"\\boxed{{{gt}}}"
     pred_answer = extract_boxed_content(pred.strip())
     gt_answer = extract_boxed_content(gt.strip())
     try:
         x = parse_latex(pred_answer)
         y = parse_latex(gt_answer)
-    except:
+    except Exception:
         return float(grade_answer(pred_answer, gt_answer))
     return float(x.equals(y) or grade_answer(pred_answer, gt_answer))
+
 # ------------------------------------------------------------------------------------
 
 
@@ -254,10 +251,6 @@ def main():
     print(f"Loading dataset {args.dataset}")
     cache_path = os.path.join(args.ds_cache, args.dataset)
     dataset = None
-    
-    plan_template = DIFFUSION_HTNTS_TEMPLATE # default plan template
-    speaker_template = LLM_TEMPLATE  # default answer template
-    
     if os.path.exists(cache_path):
         dataset = load_from_disk(cache_path)
     if args.dataset == "arc_easy":
@@ -289,7 +282,6 @@ def main():
         if not dataset:
             dataset = load_dataset("gsm8k", "main", split="test")
             dataset.save_to_disk(cache_path)  #cache the test data
-            
         #fewshot_prefix = build_gsm8k_fewshot_prefix(train_ds, k=GSM8K_FEWSHOT_K)
         fewshot_prefix = ""  # No few-shot. To do: run without few-shot 
         process_func = partial(prepare_gsm8k_sample, fewshot_prefix=fewshot_prefix)
@@ -306,6 +298,7 @@ def main():
         if not dataset :
             dataset = load_dataset("gneubig/aime-1983-2024", split='train')
             dataset.save_to_disk(cache_path)
+
         process_func = prepare_aime_sample
         compare_func = compare_answers_aime
         prefix = " "
@@ -364,8 +357,8 @@ def main():
         "dataset": args.dataset,
         "num_samples": len(all_samples),
         "accuracy": accuracy,
-        "plan_template": plan_template ,
-        "answer_template": speaker_template,
+        "plan_template": DIFFUSION_HTNTS_TEMPLATE,
+        "answer_template": LLM_TEMPLATE,
         "diffusion_max_new_tokens": yaml_config["diffusion"]["max_new_tokens"],
         "llm_max_new_tokens": yaml_config["llm"]["max_new_tokens"],
         "results": all_results,

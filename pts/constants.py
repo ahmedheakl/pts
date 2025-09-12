@@ -8,6 +8,8 @@ class Pipelines:
     llm_llm = "llm-llm"
     llm_only = "llm-only"
     diffusion_only = "diffusion-only"
+    ld_dual = "ld_dual"
+    dl_dual = "dl_dual"
     
     @staticmethod
     def all_architectures():
@@ -18,20 +20,24 @@ class Pipelines:
             Pipelines.llm_llm,
             Pipelines.llm_only,
             Pipelines.diffusion_only,
+            Pipelines.ld_dual,
+            Pipelines.dl_dual
         ]
     
     @staticmethod       
     def diffusion_plan():
         return [
             Pipelines.diffusion_llm,
-            Pipelines.diffusion_diffusion
+            Pipelines.diffusion_diffusion,
+            Pipelines.dl_dual,
         ]
         
     @staticmethod
     def llm_plan():
         return [
             Pipelines.llm_diffusion,
-            Pipelines.llm_llm
+            Pipelines.llm_llm,
+            Pipelines.ld_dual,
         ]
         
     @staticmethod
@@ -39,7 +45,8 @@ class Pipelines:
         return [
             Pipelines.diffusion_llm,
             Pipelines.llm_llm,
-            Pipelines.llm_only
+            Pipelines.llm_only,
+            Pipelines.dl_dual
         ]
         
     @staticmethod
@@ -47,5 +54,6 @@ class Pipelines:
         return [
             Pipelines.llm_diffusion,
             Pipelines.diffusion_diffusion,
-            Pipelines.diffusion_only
+            Pipelines.diffusion_only,
+            Pipelines.ld_dual
         ]

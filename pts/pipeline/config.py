@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import Optional, List
 
 class DiffusionCfg(BaseModel):
     model_id: str
@@ -25,6 +24,7 @@ class PromptingCfg(BaseModel):
     concat_header_extra: str = "## CONTEXT"
 
 class AppCfg(BaseModel):
+    pipeline_type: str = "single"
     diffusion: DiffusionCfg
     llm: LLMCfg
     runtime: RuntimeCfg

@@ -1,10 +1,10 @@
 source ~/.bashrc
-conda activate arina-cass
+conda activate .heakl
 
 set -a
 source .env
 set +a
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1 ,2,3
 
 
 for name_architecture in "diffusion-llm" "diffusion-only" "llm-diffusion" "llm-only"; do

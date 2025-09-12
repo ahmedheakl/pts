@@ -7,16 +7,28 @@ import torch
 from .config import AppCfg
 from .models.llm import LLM, LLM_GPT
 from .models.diffusion import Diffusion
+from .models.ours import OurDualModel
 from .concatenate import stitch
 from .utils import timestamp
 from pts.constants import Pipelines
 
+def to_dual_args(cfg: AppCfg):
+    return {
+        "llm_id": cfg.llm.model_id,
+        "diff_id": cfg.diffusion.model_id,
+        "max_new_tokens": cfg.llm.max_new_tokens,
+        "max_new_latents": cfg.diffusion.max_new_tokens,
+        "temperature": cfg.llm.temperature,
+        "do_sample": cfg.llm.do_sample
+    }
+    
 
 @dataclass
 class PTSPipeline:
     cfg: AppCfg
-    llm: LLM
-    diffusion: Diffusion
+    llm: Optional[LLM]
+    diffusion: Optional[Diffusion]
+    dual: Optional[OurDualModel]
 
     @classmethod
     def from_yaml(cls, path: str, use_gpt=False):
@@ -26,15 +38,18 @@ class PTSPipeline:
         # seeds
         random.seed(cfg.runtime.seed)
         torch.manual_seed(cfg.runtime.seed)
-        # models
-        diffusion = Diffusion(**cfg.diffusion.model_dump())
-
-        if use_gpt:
-            llm_gpt = LLM_GPT(**cfg.llm_gpt.model_dump())
-            llm = llm_gpt
+        llm, diffusion, dual = None, None, None
+        if cfg.pipeline_type == "dual":
+            dual = OurDualModel(**to_dual_args(cfg))
         else:
-            llm = LLM(**cfg.llm.model_dump())
-        return cls(cfg=cfg, diffusion=diffusion, llm=llm)
+            diffusion = Diffusion(**cfg.diffusion.model_dump())
+
+            if use_gpt:
+                llm_gpt = LLM_GPT(**cfg.llm_gpt.model_dump())
+                llm = llm_gpt
+            else:
+                llm = LLM(**cfg.llm.model_dump())
+        return cls(cfg=cfg, diffusion=diffusion, llm=llm, dual=dual)
 
     def generate_plan(self, user_prompt: str, name_architecture: str) -> Dict:
         if name_architecture in Pipelines.llm_plan():
@@ -49,6 +64,27 @@ class PTSPipeline:
         if name_architecture in Pipelines.llm_answer():
             return self.llm.generate(user_prompt=user_prompt)
         raise ValueError(f"Unknown architecture name: {name_architecture}")
+    
+    def generate_dual(self, user_prompt: str, plan_prompt, with_latents: bool=True) -> Dict:
+        if self.dual is None:
+            raise ValueError("Dual model is not initialized.")
+        latents, plan, diff_metadata = None, "", {}
+        if with_latents:
+            diff_out = self.dual.generate_plan(prompt=plan_prompt)
+            latents = diff_out["latents"]
+            plan = diff_out["text"]
+            diff_metadata = diff_out["metadata"]
+            
+        answer = self.dual.generate_answer(user_prompt, latents=latents)
+        return {
+            "plan": plan,
+            "answer": answer['text'],
+            "metadata": {
+                **diff_metadata,
+                **answer['metadata']
+            }
+        }
+    
 
     def run(
         self,

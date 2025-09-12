@@ -3,11 +3,11 @@ from transformers import AutoTokenizer, LlamaForCausalLM
 import torch
 from glob import glob
 from datasets import Dataset, Features, Value, Array2D, concatenate_datasets
-from tabulate import tabulate
+# from tabulate import tabulate
 import os
 import numpy as np
 from tqdm import tqdm
-
+from peft import LoraConfig
 
 model_id = "meta-llama/Llama-3.2-3B-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
@@ -20,16 +20,16 @@ model.init_latent_projector()
 LLM_TEMPLATE = """You are an expert in solving multiple-choice questions.
 Given the following plan or reasoning, please solve the question. If the plan contains any explicit answer or option letter, ignore it and solve from the hints + question only.
 {question}"""
-
-run_name = "llama3b-pixart-8bs"
-data_folder = "outputs/train"
-batch_size = 8
-gradient_accumulation = 1
-num_epochs = 3
-learning_rate = 3e-4
+latent_token = "<|reserved_special_token_3|>"
+run_name = "llama3b-pixart-4bs-2grad-lora"
+data_folder = "outputs/train_5x"
+batch_size = 4
+gradient_accumulation = 2
+num_epochs = 10
+learning_rate = 5e-4
 weight_decay = 0.001
 warmup_steps = 300
-save_steps = 875
+save_steps = 100000
 output_dir = f"/l/users/abdulrahman.mahmoud/heakl/PTS/checkpoints/{run_name}"
 eval_size_per_type = 10
 os.makedirs(output_dir, exist_ok=True)
@@ -61,6 +61,7 @@ else:
     repeated, skipped, total = 0, 0, 0
     split_pattern = "<|start_header_id|>assistant<|end_header_id|>\n\n"
     for question, answer, latent, plan, ds_type in tqdm(zip(questions, answers, latents, plans, ds_types), desc="Preparing data"):
+        question = "".join([latent_token]*128) + question
         conversations = [
             {"role": "user", "content": question},
             {"role": "assistant", "content": answer},
@@ -99,7 +100,6 @@ else:
     
     print(f"Training on {len(train_data)} samples, evaluating on {len(eval_data)} samples.")
 
-# train_data = train_data.select(range(10))
 training_args = SFTConfig(
     do_train=True,
     do_eval=False,
@@ -118,30 +118,43 @@ training_args = SFTConfig(
     warmup_steps=warmup_steps,
     fp16=False,
     bf16=True,
-    dataloader_num_workers=2,
-    dataset_num_proc=2,
+    dataloader_num_workers=1,
+    dataset_num_proc=1,
     dataloader_pin_memory=True,
     remove_unused_columns=False,
     run_name=run_name,
     report_to="wandb",
     prediction_loss_only=False,
 )
-for p in model.model.parameters():
-    p.requires_grad = False
-for p in model.latents_projector.parameters():
-    p.requires_grad = True
-for p in model.lm_head.parameters():
-    p.requires_grad = False
+# for p in model.model.parameters():
+#     p.requires_grad = False
+# for p in model.latents_projector.parameters():
+#     p.requires_grad = True
+# for p in model.lm_head.parameters():
+#     p.requires_grad = False
 
-stat = []
-for i, (name, p) in enumerate(model.named_parameters()):
-    stat.append([i, name, p.shape, p.requires_grad])
-print(tabulate(stat, headers=["idx", "name", "shape", "trainable"]))
+# stat = []
+# for i, (name, p) in enumerate(model.named_parameters()):
+#     stat.append([i, name, p.shape, p.requires_grad])
+# print(tabulate(stat, headers=["idx", "name", "shape", "trainable"]))
 
 trainer = SFTTrainer(
     args=training_args,
     model=model,
     train_dataset=train_data,
     processing_class=tokenizer,
+    peft_config=LoraConfig(
+        r=8,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        lora_alpha=32,
+    )
 )
 trainer.train()
+merged_dir = os.path.join(output_dir, "final_merged")
+peft_model = trainer.model
+merged = peft_model.merge_and_unload()     # returns a plain HF model
+merged.save_pretrained(merged_dir)
+tokenizer.save_pretrained(merged_dir)
+print(f"Model saved to {merged_dir}")
+
+

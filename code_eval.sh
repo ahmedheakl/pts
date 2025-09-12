@@ -7,9 +7,9 @@ source .env
 set +a
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3
-for name_architecture in "diffusion-diffusion" "diffusion-llm" "llm-diffusion" "diffusion-only" "llm-only" "llm-llm"; do
-    for src_subset in "truthfulqa" ; do
-        python pts/eval/eval_math_parallel.py \
+for name_architecture in "diffusion-diffusion" "diffusion-only" "diffusion-llm" "llm-diffusion" "llm-only" "llm-llm"; do
+    for src_subset in "humaneval"; do
+        python pts/eval/eval_code_parallel.py \
             --config configs/default.yaml \
             --dataset $src_subset \
             --num_samples 200 \

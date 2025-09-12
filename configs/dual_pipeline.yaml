@@ -1,0 +1,22 @@
+# Model identifiers can be HF model ids or internal checkpoints.
+pipeline_type: "dual"
+diffusion:
+  model_id: "GSAI-ML/LLaDA-8B-Instruct" #"Dream-org/Dream-v0-Instruct-7B" 
+  max_new_tokens: 128
+
+llm:
+  model_id: "/l/users/abdulrahman.mahmoud/heakl/PTS/checkpoints/llama3b-pixart-4bs-2grad-35klatents-lora/final_merged"
+  max_new_tokens: 256
+  do_sample: false
+
+runtime:
+  output_dir: "outputs"
+  json_prefix: "run"
+  seed: 42
+
+prompting:
+  # Template for the *final* LLM call that takes concatenated input
+  final_system_msg: ""
+  concat_header_plan: "## PLAN"
+  concat_header_refined: "## REFINED PLAN"
+  concat_header_extra: "## LLM Instructions"
