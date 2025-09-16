@@ -9,3 +9,11 @@ accelerate
 einops
 pydantic
 wandb
+mathruler
+tqdm
+datasets
+pylatexenc
+openai
+sacrebleu
+rouge-score
+accelerate

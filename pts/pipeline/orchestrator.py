@@ -32,6 +32,7 @@ class PTSPipeline:
 
     @classmethod
     def from_yaml(cls, path: str, use_gpt=False):
+        
         with open(path, "r") as f:
             raw = yaml.safe_load(f)
         cfg = AppCfg(**raw)
@@ -39,11 +40,12 @@ class PTSPipeline:
         random.seed(cfg.runtime.seed)
         torch.manual_seed(cfg.runtime.seed)
         llm, diffusion, dual = None, None, None
+        
         if cfg.pipeline_type == "dual":
+            
             dual = OurDualModel(**to_dual_args(cfg))
         else:
             diffusion = Diffusion(**cfg.diffusion.model_dump())
-
             if use_gpt:
                 llm_gpt = LLM_GPT(**cfg.llm_gpt.model_dump())
                 llm = llm_gpt
@@ -65,6 +67,8 @@ class PTSPipeline:
             return self.llm.generate(user_prompt=user_prompt)
         raise ValueError(f"Unknown architecture name: {name_architecture}")
     
+
+    # Dual model generation with latents !
     def generate_dual(self, user_prompt: str, plan_prompt, with_latents: bool=True) -> Dict:
         if self.dual is None:
             raise ValueError("Dual model is not initialized.")

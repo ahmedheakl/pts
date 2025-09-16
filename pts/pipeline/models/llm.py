@@ -13,7 +13,7 @@ class LLM:
         self.temperature = temperature
         self.do_sample = do_sample
         self.tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
-        self.model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map="auto").eval()
+        self.model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map="auto", attn_implementation="eager").eval()
         
 
     def generate(self, user_prompt: str, system_prompt=None) -> Dict:

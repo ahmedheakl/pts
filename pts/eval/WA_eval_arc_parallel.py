@@ -20,7 +20,6 @@ from pts.constants import Pipelines
 from pts.eval.compare_prepare.aime import compare_answers_aime, prepare_aime_sample
 from pts.eval.compare_prepare.truthfulQA import compare_answers_truthqa, prepare_truthfulqa_sample
 
-from pts.pipeline.attention import analyze_plan_attention, analyze_attention_results
 
 
 ARC_QUESTION_PROMPT_TEMPLATE = """Question: {question}\n{choices_text}"""
@@ -212,7 +211,7 @@ def worker_evaluate(
     name_architecture,
     compare_func=compare_answers_mcq,
     postfix=MCQ_QUESTION_POSTFIX,
-    analyze_attention=True,  
+    
 ):
     torch.cuda.set_device(rank)
     pipeline = PTSPipeline.from_yaml(configs)
@@ -244,31 +243,7 @@ def worker_evaluate(
         print(out["text"])
 
 
-        if analyze_attention:
-            try:
-                print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-                attention_metrics = analyze_plan_attention(
-                    pipeline.llm.model,
-                    pipeline.llm.tokenizer,
-                    question,
-                    plan["text"],
-                    out["text"],
-                    template=LLM_TEMPLATE.format(question="{question}", plan="{plan}") + postfix
-                )
-                    
-                    # Store attention results
-                attention_results.append({
-                    'question': question,
-                    'plan': plan["text"],
-                    'attention_metrics': attention_metrics
-                })
-                    
-                print(f"Plan Attention Ratio: {attention_metrics['plan_attention_ratio']:.3f}")
-                    
-            except Exception as e:
-                print(f"[GPU {rank}] Attention analysis failed: {e}")
-                attention_metrics = None
-
+        
 
 
         # Store results with attention metrics
@@ -280,9 +255,7 @@ def worker_evaluate(
             "ground_truth": plan["correct"],
         }
         
-        # Add attention metrics if available
-        if attention_metrics:
-            result["attention_metrics"] = attention_metrics
+        #
             
         local_results.append(result)
 
@@ -430,14 +403,14 @@ def main():
     accuracy = sum(acc) * 100 / len(acc)
     yaml_config = read_yaml(args.config)
 
-    print("YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYYYYYYYYYYYYYYYY")
+    print()
     # Call analyze_attention_results to generate a json
     analyze_attention_results(
         all_results,
         architecture=args.name_architecture,
         model_diffusion=yaml_config["diffusion"]["model_id"],
         model_llm=yaml_config["llm"]["model_id"],
-        benchmark_name=benchmark_name,
+        benchmark_name=benchmark_name
     )
 
     output_dict = {
