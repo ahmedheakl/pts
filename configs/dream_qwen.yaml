@@ -1,12 +1,12 @@
 # Model identifiers can be HF model ids or internal checkpoints.
 diffusion:
-  model_id: "GSAI-ML/LLaDA-8B-Instruct" #"Dream-org/Dream-v0-Instruct-7B" 
+  model_id: "Dream-org/Dream-v0-Instruct-7B" 
   device: "cuda:0"      # or "cpu"
   max_new_tokens: 256
 
 llm:
-  model_id: "Qwen/Qwen2.5-3B-Instruct"
-  device: "cuda:1"
+  model_id: "Qwen/Qwen2.5-3B-Instruct"  #"Qwen/Qwen2.5-7B-Instruct
+  device: "cuda:0"
   max_new_tokens: 512
   temperature: 0
   do_sample: false
