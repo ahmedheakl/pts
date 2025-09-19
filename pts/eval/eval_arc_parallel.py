@@ -88,7 +88,7 @@ def prepare_arc_sample(item):
 
 
 def compare_answers_mcq(predicted, correct):
-    pred_answer = re.match(r"^(?:Answer:\s*)?([A-Da-d])\.?$", predicted.strip())
+    pred_answer = re.match(r"^(?:Answer[:\s]*)?([A-Da-d])\.?$", predicted.strip())
     if not pred_answer:
         return 0.0
     matched_group = pred_answer.group(1) or pred_answer.group(2)
