@@ -88,11 +88,12 @@ def prepare_arc_sample(item):
 
 
 def compare_answers_mcq(predicted, correct):
-    pred_answer = re.match(r"^(?:Answer[:\s]*)?([A-Da-d])\.?$", predicted.strip())
-    if not pred_answer:
+    # Search for the first letter A-D after "Answer:" or standalone
+    match = re.search(r"Answer[:\s]*([A-Da-d])\b|^([A-Da-d])\b", predicted)
+    if not match:
         return 0.0
-    matched_group = pred_answer.group(1) or pred_answer.group(2)
-    response = matched_group.strip()[0]
+    # Get the matched letter from either group
+    response = match.group(1) or match.group(2)
     return float(correct.lower().strip()[0] == response.lower())
 
 
